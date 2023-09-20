@@ -1,0 +1,4 @@
+# Apply LF to shell scripts automatically
+*.sh text eol=lf
+*.Dockerfile text eol=lf
+Dockerfile text eol=lf
