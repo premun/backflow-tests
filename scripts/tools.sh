@@ -15,3 +15,37 @@ function highlight () {
   echo "$FAILURE_PREFIX${COLOR_CYAN}${1//${COLOR_RESET}/${COLOR_CYAN}}${COLOR_CLEAR}"
 }
 
+function createRepoPatch() {
+  local from=$1
+  local to=$2
+
+  path=/work/repo
+  name="$path-${from}-${to}.patch"
+
+  local res=$(createPatch "$path" "$name" "$from" "$to")
+  echo "$res"
+}
+
+function createVmrPatch() {
+  local from=$1
+  local to=$2
+
+  path=/work/tmp/vmr
+  name="$path-${from}-${to}.patch"
+
+  local res=$(createPatch "$path" "$name" "$from" "$to")
+  echo "$res"
+}
+
+function createPatch() {
+  local path=$1
+  local name=$2
+  local from=$3
+  local to=$4
+
+  pushd /work/vmr/src || exit 1
+  git diff --patch --binary --output "$name" --relative "$from..$to" -- .
+  popd || exit 1
+
+  echo "$name"
+}
