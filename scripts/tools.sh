@@ -49,3 +49,13 @@ function createPatch() {
 
   echo "$name"
 }
+
+function applyPatchToVmr() {
+  local path=$1
+  git -C /work/vmr apply --cached --ignore-space-change --directory src "$1" || fail "Applying the patch failed!"
+}
+
+function applyPatchToRepo() {
+  local path=$1
+  git -C /work/repo apply --cached --ignore-space-change "$1" || fail "Applying the patch failed!"
+}
