@@ -1,10 +1,10 @@
-This repo contains different edge cases that can happen when syncing a git repository into another one under a different path plus you ignore parts of it.
+This repo contains a simulation of VMR (https://github.com/dotnet/dotnet) two-way synchronization process.
 
 # How to
 
 ```
-git clone https://github.com/premun/git-patch-test
-cd git-patch-test
+git clone https://github.com/premun/backflow-tests
+cd backflow-tests
 .\build-containers.ps1
 .\run-tests.ps1
 .\run-tests.ps1 -Case 4
