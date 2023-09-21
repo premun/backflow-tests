@@ -177,6 +177,8 @@ function checkConflict() {
     git -C "$repo" reset --hard pr-branch
   else
     fail "RESULT: Conflicts with $branch"
+    cat "$repo"/A.txt 2>/dev/null
+    cat "$repo"/src/A.txt 2>/dev/null
     git -C "$repo" merge --abort
   fi
 }
