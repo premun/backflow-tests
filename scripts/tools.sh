@@ -24,21 +24,14 @@ function createRepoPatch() {
   local from=$1
   local to=$2
 
-  path=/work/repo
-  name="$path-${from}-${to}.patch"
-
-  local res=$(createPatch "$path" "$name" "$from" "$to")
+  local res=$(createPatch /work/repo "/work/tmp/repo-${from}-${to}.patch" "$from" "$to" .)
   echo "$res"
 }
 
 function createVmrPatch() {
   local from=$1
   local to=$2
-
-  path=/work/tmp/vmr
-  name="$path-${from}-${to}.patch"
-
-  local res=$(createPatch "$path" "$name" "$from" "$to")
+  local res=$(createPatch /work/vmr/src "/work/tmp/vmr-${from}-${to}.patch" "$from" "$to")
   echo "$res"
 }
 
@@ -48,10 +41,10 @@ function createPatch() {
   local from=$3
   local to=$4
 
-  pushd "$path" || exit 1
+  pushd "$path" 1>/dev/null || exit 1
   git diff --patch --binary --output "$name" --relative "$from..$to" -- . \
     || fail "Failed to create patch"
-  popd || exit 1
+  popd 1>/dev/null || exit 1
 
   echo "$name"
 }
@@ -61,14 +54,16 @@ function applyPatchToVmr() {
 }
 
 function applyPatchToRepo() {
-  applyPatch /work/repo "$1" .
+  applyPatch /work/repo "$1" ''
 }
 
 function applyPatch() {
   local repoPath=$1
   local patchPath=$2
   local targetDir=$3
-  git -C "$repoPath" apply --ignore-space-change --directory "$targetDir" "$patchPath" || fail "Applying the patch failed!"
+  pushd "$repoPath" 1>/dev/null || exit 1
+  git apply --ignore-space-change --directory "$targetDir" "$patchPath" || fail "Applying the patch failed!"
+  popd 1>/dev/null || exit 1
 }
 
 function getRepoSha() {
@@ -125,49 +120,63 @@ function show() {
 }
 
 function forwardFlow() {
-  local toSha=$1
-  local baseSha=$2
+  local baseSha=$1
+  local toSha=$2
   local fromSha="$(cat /work/vmr/last_sync)"
 
-  echo "Flowing code from repo to VMR ($fromSha → $toSha)"
-  flow /work/repo /work/vmr "$fromSha" "$toSha" "$baseSha" src
-
-  if git -C /work/vmr merge main --no-ff --no-commit; then
-    succeed "RESULT: No conflicts with main"
-    git -C /work/vmr reset --hard pr-branch
-  else
-    fail "RESULT: Conflicts with main"
-    git -C /work/vmr merge --abort
+  if [ -z "$toSha" ]; then
+    # Last commit in VMR
+    toSha=$(getRepoSha)
   fi
+
+  echo "Flowing code from repo to VMR ($fromSha → $toSha)"
+
+  patch=$(createRepoPatch "$fromSha" "$toSha")
+  git -C /work/vmr/ checkout -b pr-branch "$baseSha"
+  applyPatchToVmr "$patch"
+  echo "$toSha" > /work/vmr/last_sync
+  git -C /work/vmr add -A
+  git -C /work/vmr commit -am "Sync from $fromSha to $toSha"
+
+  checkConflict /work/vmr main
 }
 
 function backwardFlow() {
   local toSha=$1
-  local baseSha=$2
+  local baseSha=$(cat /work/vmr/last_sync)
   local fromSha=$(cat /work/repo/last_sync)
-  
+
+  if [ -z "$toSha" ]; then
+    # Last commit in VMR
+    toSha=$(getVmrSha)
+  fi
+
   if [ -z "$fromSha" ]; then
     # First commit in VMR
-    fromSha=$(git -C /work/vmr log --format=format:%H | tail -n 1)
+    fromSha=$(getVmrSha 1000)
   fi
 
   echo "Flowing code from VMR to repo ($fromSha → $toSha)"
-  flow /work/vmr /work/repo "$fromSha" "$toSha" "$baseSha" .
+
+  patch=$(createVmrPatch "$fromSha" "$toSha")
+  git -C /work/repo/ checkout -b pr-branch "$baseSha"
+  applyPatchToRepo "$patch"
+  echo "$toSha" > /work/repo/last_sync
+  git -C /work/repo add -A
+  git -C /work/repo commit -am "Sync from $fromSha to $toSha"
+
+  checkConflict /work/repo main
 }
 
-function flow() {
-  local fromRepoPath=$1
-  local toRepoPath=$2
-  local fromSha=$3
-  local toSha=$4
-  local targetBaseSha=$5
-  local targetDir=$6
-
-  local patch=/work/tmp/pr.patch
-  createPatch "$fromRepoPath" "$patch" "$fromSha" "$toSha"
-  git -C "$toRepoPath" checkout -b pr-branch "$targetBaseSha"
-  applyPatch "$toRepoPath" "$patch" "$targetDir"
-  echo "$toSha" > "$toRepoPath"/last_sync
-  git -C "$toRepoPath" add -A
-  git -C "$toRepoPath" commit -am "Sync of $fromRepoPath from $fromSha to $toSha"
+function checkConflict() {
+  local repo=$1
+  local branch=$2
+  
+  if git -C "$repo" merge "$branch" --no-ff --no-commit; then
+    succeed "RESULT: No conflicts with $branch"
+    git -C "$repo" reset --hard pr-branch
+  else
+    fail "RESULT: Conflicts with $branch"
+    git -C "$repo" merge --abort
+  fi
 }
