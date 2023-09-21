@@ -51,13 +51,17 @@ function createPatch() {
 }
 
 function applyPatchToVmr() {
-  local path=$1
-  git -C /work/vmr apply --cached --ignore-space-change --directory src "$1" || fail "Applying the patch failed!"
+  applyPatch /work/vmr "$1"
 }
 
 function applyPatchToRepo() {
-  local path=$1
-  git -C /work/repo apply --cached --ignore-space-change "$1" || fail "Applying the patch failed!"
+  applyPatch /work/repo "$1"
+}
+
+function applyPatch() {
+  local repoPath=$1
+  local patchPath=$2
+  git -C "$repoPath" apply --cached --ignore-space-change "$patchPath" || fail "Applying the patch failed!"
 }
 
 function getRepoSha() {
@@ -81,4 +85,69 @@ function getSha() {
 
   local sha=$(git -C "$path" log --format=format:%H | head -n $order | tail -n 1)
   echo "$sha"
+}
+
+function commitToRepo() {
+  local content=$1
+  commitChange /work/repo /work/repo/A.txt "$content"
+}
+
+function commitToVmr() {
+  local content=$1
+  commitChange /work/vmr /work/vmr/src/A.txt "$content"
+}
+
+function commitChange() {
+  local repo=$1
+  local path=$2
+  local content=$3
+  echo "$content" > "$path"
+  git -C "$repo" commit -am "A.txt set to $content"
+}
+
+function showRepo() {
+  show /work/repo
+}
+
+function showVmr() {
+  show /work/vmr
+}
+
+function show() {
+  git -C "$1" log --graph --decorate --oneline --all
+}
+
+function forwardFlow() {
+  local toSha=$1
+  local baseSha=$2
+  local fromSha="$(cat /work/vmr/last-sync)"
+  flow /work/repo /work/vmr "$fromSha" "$toSha" "$baseSha"
+}
+
+function backwardFlow() {
+  local toSha=$1
+  local baseSha=$2
+  local fromSha=$(cat /work/repo/last-sync)
+  
+  if [ -z "$fromSha" ]; then
+    # First commit in VMR
+    fromSha=$(git -C /work/vmr log --format=format:%H | tail -n 1)
+  fi
+
+  flow /work/vmr /work/repo "$fromSha" "$toSha" "$baseSha"
+}
+
+function flow() {
+  local fromRepoPath=$1
+  local toRepoPath=$2
+  local fromSha=$3
+  local toSha=$4
+  local targetBaseSha=$5
+
+  local patch=$(createPatch "$fromRepoPath" "/work/tmp/pr.patch" "$fromSha" "$toSha")
+  git -C "$toRepoPath" checkout -b pr-branch "$targetBaseSha"
+  applyPatch "$toRepoPath" "$patch"
+  echo "$toSha" > "$toRepoPath"/last-sync
+  git -C "$toRepoPath" add -A
+  git -C "$toRepoPath" commit -am "Sync of $fromRepoPath from $fromSha to $toSha"
 }

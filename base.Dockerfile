@@ -20,15 +20,24 @@ RUN mkdir -p /work/repo \
 
 RUN cd /work/repo \
  && git init -b main \
- && echo "Line 1\nLine 2\nLine 3\n" > A.txt \
+ && echo "111" > A.txt \
  && git add -A \
- && git commit -m "initial commit of A.txt"
+ && git commit -m "A.txt set to 111"
 
 RUN cd /work/vmr \
  && git init -b main \
- && echo "Line 1\nLine 2\nLine 3\n" > src/A.txt \
+ && echo "111" > src/A.txt \
+ && git -C /work/repo rev-parse HEAD > last_sync \
  && git add -A \
- && git commit -m "initial commit of A.txt"
+ && git commit -m "A.txt set to 111"
+
+COPY [ "scripts/tools.sh", "/work/tools.sh" ]
+
+RUN cd /work/repo \
+ && echo "222" > A.txt \
+ && git commit -am "A.txt set to 222" \
+ && echo "333" > A.txt \
+ && git commit -am "A.txt set to 333"
 
 WORKDIR /work
 
