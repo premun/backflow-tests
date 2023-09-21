@@ -16,6 +16,7 @@ RUN git config --global user.email "prvysoky@microsoft.com" \
  && git config --global user.name "Premek Vysoky"
 
 RUN mkdir -p /work/repo \
+ && mkdir -p /work/tmp \
  && mkdir -p /work/vmr/src
 
 RUN cd /work/repo \
@@ -32,6 +33,7 @@ RUN cd /work/vmr \
  && git commit -m "A.txt set to 111"
 
 COPY [ "scripts/tools.sh", "/work/tools.sh" ]
+COPY [ "scripts/run.sh", "/work/run.sh" ]
 
 RUN cd /work/repo \
  && echo "222" > A.txt \
