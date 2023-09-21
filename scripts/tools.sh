@@ -59,3 +59,26 @@ function applyPatchToRepo() {
   local path=$1
   git -C /work/repo apply --cached --ignore-space-change "$1" || fail "Applying the patch failed!"
 }
+
+function getRepoSha() {
+  local res=$(getSha /work/repo "$1")
+  echo "$res"
+}
+
+function getVmrSha() {
+  local res=$(getSha /work/vmr "$1")
+  echo "$res"
+}
+
+function getSha() {
+  local path=$1
+  local order
+  if [ -z "$2" ]; then
+    order=1
+  else
+    order=$2
+  fi
+
+  local sha=$(git -C "$path" log --format=format:%H | head -n $order | tail -n 1)
+  echo "$sha"
+}
